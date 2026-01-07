@@ -2,6 +2,7 @@ import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import { axiosInstance } from "../lib/axios";
 import { toast } from "react-toastify";
 
+// Fetch all users for the sidebar
 export const getUsers = createAsyncThunk(
   "chat/getUsers",
   async (_, thunkAPI) => {
@@ -29,15 +30,27 @@ export const getMessages = createAsyncThunk(
   }
 );
 
-// Send a new message
+// Mark messages as seen in Database
+export const markMessagesAsSeen = createAsyncThunk(
+  "chat/markMessagesAsSeen",
+  async (userId, thunkAPI) => {
+    try {
+      const response = await axiosInstance.post(`/message/seen/${userId}`);
+      return response.data;
+    } catch (error) {
+      return thunkAPI.rejectWithValue(error.response?.data?.message);
+    }
+  }
+);
+
+// Send a new message (Handles both Text and Media)
 export const sendMessage = createAsyncThunk(
   "chat/sendMessage",
   async ({ receiverId, messageData }, thunkAPI) => {
-    // Destructure the object here
     try {
       const response = await axiosInstance.post(
         `/message/send/${receiverId}`,
-        messageData // This is your FormData
+        messageData
       );
       return response.data;
     } catch (error) {
@@ -49,8 +62,6 @@ export const sendMessage = createAsyncThunk(
   }
 );
 
-
-
 const chatAppSlice = createSlice({
   name: "chat",
   initialState: {
@@ -59,22 +70,46 @@ const chatAppSlice = createSlice({
     selectedUser: null,
     isUsersLoading: false,
     isMessagesLoading: false,
+    isSendindMessages: false,
+    unreadCounts: {},
   },
 
   reducers: {
     setSelectedUser: (state, action) => {
       state.selectedUser = action.payload;
-      state.messages = [];
     },
-    // Useful for real-time socket updates later
+
     addMessage: (state, action) => {
-      state.messages.push(action.payload);
+      const isDuplicate = state.messages.some(
+        (m) => m._id === action.payload._id
+      );
+      if (!isDuplicate) {
+        state.messages.push(action.payload);
+      }
+    },
+
+    updateMessageStatusLocal: (state, action) => {
+      const receiverId = action.payload;
+      state.messages = state.messages.map((msg) =>
+        msg.recieverId === receiverId ? { ...msg, seen: true } : msg
+      );
+    },
+
+    incrementUnreadCount: (state, action) => {
+      const userId = action.payload;
+      if (!state.unreadCounts) state.unreadCounts = {};
+      state.unreadCounts[userId] = (state.unreadCounts[userId] || 0) + 1;
+    },
+
+    resetUnreadCount: (state, action) => {
+      const userId = action.payload;
+      if (!state.unreadCounts) state.unreadCounts = {};
+      state.unreadCounts[userId] = 0;
     },
   },
 
   extraReducers: (builder) => {
     builder
-      // Handle getUsers
       .addCase(getUsers.pending, (state) => {
         state.isUsersLoading = true;
       })
@@ -86,7 +121,6 @@ const chatAppSlice = createSlice({
         state.isUsersLoading = false;
       })
 
-      // Handle getMessages
       .addCase(getMessages.pending, (state) => {
         state.isMessagesLoading = true;
       })
@@ -98,17 +132,42 @@ const chatAppSlice = createSlice({
         state.isMessagesLoading = false;
       })
 
+      .addCase(sendMessage.pending, (state) => {
+        state.isSendindMessages = true;
+      })
       .addCase(sendMessage.fulfilled, (state, action) => {
-        if (!Array.isArray(state.messages)) {
-          state.messages = [];
+        state.isSendindMessages = false; 
+        if (!Array.isArray(state.messages)) state.messages = [];
+        const newMessage = action.payload.newMessage;
+        if (newMessage) {
+          const isDuplicate = state.messages.some(
+            (m) => m._id === newMessage._id
+          );
+          if (!isDuplicate) {
+            state.messages.push(newMessage);
+          }
         }
+      })
+      .addCase(sendMessage.rejected, (state) => {
+        state.isSendindMessages = false;
+      })
 
-        if (action.payload.newMessage) {
-          state.messages.push(action.payload.newMessage);
-        }
+      .addCase(markMessagesAsSeen.fulfilled, (state) => {
+        state.messages = state.messages.map((msg) =>
+          msg.senderId === state.selectedUser?._id
+            ? { ...msg, seen: true }
+            : msg
+        );
       });
   },
 });
 
-export const { setSelectedUser, addMessage } = chatAppSlice.actions;
+export const {
+  setSelectedUser,
+  addMessage,
+  updateMessageStatusLocal,
+  incrementUnreadCount,
+  resetUnreadCount,
+} = chatAppSlice.actions;
+
 export default chatAppSlice.reducer;

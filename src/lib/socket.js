@@ -20,6 +20,7 @@ export const connectSocket = (userId) => {
     // FIX 2: Send cookies/headers if backend expects 'credentials: true'
     withCredentials: true, 
   });
+  
 
   socket.on("connect", () => {
     console.log("✅ Connected to socket server:", socket.id);

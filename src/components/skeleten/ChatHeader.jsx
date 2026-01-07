@@ -2,9 +2,9 @@ import React from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { X } from "lucide-react";
 // FIX: Import the action from your slice
-import { setSelectedUser } from "../../slices/chatSlices"; 
+import { setSelectedUser } from "../../slices/chatSlices";
 
-const ChatHeader = () => {
+const ChatHeader = ({ isTyping }) => {
   const { selectedUser } = useSelector((state) => state.chat);
   const { onlineUsers } = useSelector((state) => state.auth);
   const dispatch = useDispatch();
@@ -39,16 +39,26 @@ const ChatHeader = () => {
             <h3 className="font-medium text-sm text-gray-900 leading-tight">
               {selectedUser?.fullname}
             </h3>
-            <p className={`text-xs ${isOnline ? "text-green-500" : "text-gray-400"}`}>
-              {isOnline ? "Online" : "Offline"}
-            </p>
+            {isTyping ? (
+              <p className="text-xs text-blue-500 font-medium animate-pulse">
+                typing...
+              </p>
+            ) : (
+              <p
+                className={`text-xs ${
+                  isOnline ? "text-green-500" : "text-gray-400"
+                }`}
+              >
+                {isOnline ? "Online" : "Offline"}
+              </p>
+            )}
           </div>
         </div>
 
         {/* Close Button */}
         <button
           // FIX: Use the imported action creator here
-          onClick={() => dispatch(setSelectedUser(null))} 
+          onClick={() => dispatch(setSelectedUser(null))}
           className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-500 hover:text-gray-700"
         >
           <X className="w-5 h-5" />
