@@ -141,82 +141,92 @@ const MessageInput = () => {
   };
 
   return (
-    <div className="p-4 w-full bg-white border-t border-gray-100">
+   <div className="p-2 md:p-4 w-full bg-white border-t border-gray-100">
+      {/* Media Preview Section - isko flexible banaya taaki mobile pe na fate */}
       {mediaPreview && (
-        <div className="mb-3 flex items-center gap-2 bg-gray-50 p-3 rounded-xl border border-dashed border-gray-300">
-          <div className="relative">
-            {mediaType === "image" && <img src={mediaPreview} alt="preview" className="w-20 h-20 object-cover rounded-lg border" />}
-            {mediaType === "video" && <video src={mediaPreview} className="w-32 h-32 rounded-lg border" controls />}
+        <div className="mb-2 flex items-center gap-2 bg-gray-50 p-2 rounded-xl border border-dashed border-gray-300 overflow-x-auto">
+          <div className="relative shrink-0">
+            {mediaType === "image" && <img src={mediaPreview} alt="preview" className="w-16 h-16 md:w-20 md:h-20 object-cover rounded-lg border" />}
+            {mediaType === "video" && <video src={mediaPreview} className="w-24 h-24 md:w-32 md:h-32 rounded-lg border" controls />}
             {mediaType === "audio" && (
-              <div className="flex items-center gap-3 bg-white p-2 rounded-lg border shadow-sm min-w-[200px]">
-                <Mic className="text-blue-500" size={20} />
-                <audio src={mediaPreview} controls className="h-8 w-48" />
+              <div className="flex items-center gap-2 bg-white p-2 rounded-lg border shadow-sm min-w-[180px]">
+                <Mic className="text-blue-500" size={18} />
+                <audio src={mediaPreview} controls className="h-8 w-40" />
               </div>
             )}
             <button
               onClick={removeMedia}
-              disabled={isSendindMessages} // Disable delete while sending
-              className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center shadow-md hover:bg-red-600 disabled:bg-gray-400"
+              disabled={isSendindMessages}
+              className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center shadow-md active:scale-90"
             >
-              <Trash2 size={14} />
+              <Trash2 size={12} />
             </button>
           </div>
         </div>
       )}
 
-      <form onSubmit={handleSendMessage} className="flex items-center gap-2">
-        <div className={`flex-1 flex items-center gap-2 bg-gray-50 px-3 py-1 rounded-2xl border border-gray-200 transition-all ${isSendindMessages ? "opacity-60" : "focus-within:ring-2 focus-within:ring-blue-500"}`}>
+      {/* Main Form Container */}
+      <form onSubmit={handleSendMessage} className="flex items-center gap-1.5 md:gap-2 max-w-full">
+        <div className={`flex-1 flex items-center gap-1 md:gap-2 bg-gray-50 px-2 md:px-3 py-1 rounded-2xl border border-gray-200 transition-all min-w-0 ${isSendindMessages ? "opacity-60" : "focus-within:ring-2 focus-within:ring-blue-500"}`}>
+          
           <input type="file" accept="image/*,video/*" ref={fileInputRef} className="hidden" onChange={handleMediaChange} />
 
           {!isRecording ? (
             <>
+              {/* Image Picker Icon */}
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isSendindMessages}
-                className="text-gray-500 hover:text-blue-600 disabled:cursor-not-allowed"
+                className="p-1 text-gray-500 hover:text-blue-600 shrink-0"
               >
-                <ImageIcon size={22} />
+                <ImageIcon size={20} className="md:w-[22px]" />
               </button>
               
+              {/* Input Field - min-w-0 is key here */}
               <input
                 type="text"
-                placeholder={isSendindMessages ? "Sending media..." : "Type a message..."}
-                className="flex-1 bg-transparent py-2 px-1 focus:outline-none text-sm text-gray-700 disabled:cursor-not-allowed"
+                placeholder={isSendindMessages ? "Sending..." : "Message..."}
+                className="flex-1 min-w-0 bg-transparent py-2 px-1 focus:outline-none text-[15px] md:text-sm text-gray-700 disabled:cursor-not-allowed"
                 value={text}
                 onChange={handleInputChange}
                 disabled={mediaType === "audio" || isSendindMessages}
               />
 
+              {/* Mic Icon */}
               <button
                 type="button"
                 onClick={startRecording}
                 disabled={isSendindMessages}
-                className="text-gray-500 hover:text-red-500 disabled:cursor-not-allowed"
+                className="p-1 text-gray-500 hover:text-red-500 shrink-0"
               >
-                <Mic size={22} />
+                <Mic size={20} className="md:w-[22px]" />
               </button>
             </>
           ) : (
-            <div className="flex-1 flex items-center justify-between py-2">
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-                <span className="text-sm font-medium text-gray-600">Recording... {formatTime(recordingTime)}</span>
+            /* Recording State */
+            <div className="flex-1 flex items-center justify-between py-2 min-w-0">
+              <div className="flex items-center gap-2 truncate">
+                <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse shrink-0" />
+                <span className="text-xs md:text-sm font-medium text-gray-600 truncate">
+                  Recording {formatTime(recordingTime)}
+                </span>
               </div>
-              <button type="button" onClick={stopRecording} className="text-red-600 hover:bg-red-50 p-1 rounded-full"><Square size={20} fill="currentColor" /></button>
+              <button type="button" onClick={stopRecording} className="text-red-600 p-1 shrink-0"><Square size={18} fill="currentColor" /></button>
             </div>
           )}
         </div>
 
+        {/* Send Button */}
         <button
           type="submit"
           disabled={(!text.trim() && !media) || isRecording || isSendindMessages}
-          className="w-11 h-11 flex items-center justify-center rounded-full bg-blue-600 text-white hover:bg-blue-700 shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed transform active:scale-95"
+          className="w-10 h-10 md:w-11 md:h-11 shrink-0 flex items-center justify-center rounded-full bg-blue-600 text-white shadow-md active:scale-95 disabled:opacity-50"
         >
           {isSendindMessages ? (
-            <Loader2 size={20} className="animate-spin" />
+            <Loader2 size={18} className="animate-spin" />
           ) : (
-            <Send size={20} className={text.trim() || media ? "ml-0.5" : ""} />
+            <Send size={18} className="md:w-[20px] ml-0.5" />
           )}
         </button>
       </form>
