@@ -1,11 +1,12 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import SideBarSkeleton from "./SideBarSkeleton";
-import { 
-  getUsers, 
-  setSelectedUser, 
-  incrementUnreadCount, 
-  resetUnreadCount 
+import {
+  getUsers,
+  setSelectedUser,
+  incrementUnreadCount,
+  resetUnreadCount,
+  addMessage,
 } from "../../slices/chatSlices";
 import { getSocket } from "../../lib/socket";
 import { Users } from "lucide-react";
@@ -13,12 +14,12 @@ import { Users } from "lucide-react";
 const Sidebar = () => {
   const dispatch = useDispatch();
   const socket = getSocket();
-  
+
   // 1. Audio reference for notifications
   const notificationSound = useRef(new Audio("/notification.mp3"));
 
   const [showOnlineUsers, setShowOnlineUsers] = useState(false);
-  
+
   // Get data from Redux Store
   const { users, selectedUser, isUsersLoading, unreadCounts } = useSelector(
     (state) => state.chat
@@ -37,19 +38,25 @@ const Sidebar = () => {
     }
   }, [selectedUser?._id, dispatch]);
 
+
+
+
   // 4. Socket listener for real-time sidebar updates
   useEffect(() => {
     if (!socket || !authUser?._id) return;
-      
+
     const handleNewMessage = (newMessage) => {
       const isFromMe = newMessage.senderId === authUser._id;
       const isChatNotOpen = selectedUser?._id !== newMessage.senderId;
 
+      // --- YE LINE ADD KARO ---
+      // Isse slice ka addMessage trigger hoga aur sorting chal jayegi
+      dispatch(addMessage(newMessage));
+
       if (isChatNotOpen && !isFromMe) {
-        // Play sound
-        notificationSound.current.play().catch((e) => console.log("Sound error:", e));
-        
-        // Increment badge count
+        notificationSound.current
+          .play()
+          .catch((e) => console.log("Sound error:", e));
         dispatch(incrementUnreadCount(newMessage.senderId));
       }
     };
@@ -57,6 +64,9 @@ const Sidebar = () => {
     socket.on("newMessage", handleNewMessage);
     return () => socket.off("newMessage", handleNewMessage);
   }, [socket, selectedUser?._id, authUser?._id, dispatch]);
+
+
+  
 
   // Filter logic
   const filterOnlineUsers = showOnlineUsers
@@ -71,7 +81,9 @@ const Sidebar = () => {
       <div className="border-b border-gray-200 w-full p-5">
         <div className="flex items-center gap-2">
           <Users className="w-6 h-6 text-gray-700" />
-          <span className="font-medium hidden lg:block text-gray-800">Contacts</span>
+          <span className="font-medium hidden lg:block text-gray-800">
+            Contacts
+          </span>
         </div>
 
         {/* Online Toggle (Hidden on mobile to keep it clean) */}
@@ -101,7 +113,11 @@ const Sidebar = () => {
               key={user._id}
               onClick={() => dispatch(setSelectedUser(user))}
               className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-100 transition-colors relative
-                ${selectedUser?._id === user._id ? "bg-gray-100 ring-1 ring-gray-200" : ""}
+                ${
+                  selectedUser?._id === user._id
+                    ? "bg-gray-100 ring-1 ring-gray-200"
+                    : ""
+                }
               `}
             >
               {/* --- Avatar Container --- */}
@@ -111,7 +127,7 @@ const Sidebar = () => {
                   alt={user?.fullname}
                   className="w-12 h-12 lg:w-10 lg:h-10 rounded-full object-cover border border-gray-200"
                 />
-                
+
                 {/* Online Status Dot */}
                 {onlineUsers.includes(user._id) && (
                   <span className="absolute bottom-0 right-0 block h-3 w-3 rounded-full ring-2 ring-white bg-green-500 shadow-sm" />
@@ -131,7 +147,7 @@ const Sidebar = () => {
                   <div className="font-medium text-gray-800 truncate">
                     {user.fullname}
                   </div>
-                  
+
                   {/* --- DESKTOP BADGE (Beside Name) --- */}
                   {count > 0 && (
                     <span className="bg-blue-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full min-w-[20px] text-center animate-pulse shadow-sm">

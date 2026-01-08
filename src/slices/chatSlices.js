@@ -30,7 +30,6 @@ export const getMessages = createAsyncThunk(
   }
 );
 
-// Mark messages as seen in Database
 export const markMessagesAsSeen = createAsyncThunk(
   "chat/markMessagesAsSeen",
   async (userId, thunkAPI) => {
@@ -42,6 +41,8 @@ export const markMessagesAsSeen = createAsyncThunk(
     }
   }
 );
+
+
 
 // Send a new message (Handles both Text and Media)
 export const sendMessage = createAsyncThunk(
@@ -62,6 +63,20 @@ export const sendMessage = createAsyncThunk(
   }
 );
 
+
+export const deleteMessageAction = createAsyncThunk(
+  "chat/deleteMessage",
+  async (messageId, thunkAPI) => {
+    try {
+      await axiosInstance.delete(`/message/delete/${messageId}`);
+      return messageId;
+    } catch (error) {
+      return thunkAPI.rejectWithValue(error.response.data.message);
+    }
+  }
+);
+
+
 const chatAppSlice = createSlice({
   name: "chat",
   initialState: {
@@ -80,11 +95,27 @@ const chatAppSlice = createSlice({
     },
 
     addMessage: (state, action) => {
-      const isDuplicate = state.messages.some(
-        (m) => m._id === action.payload._id
-      );
+      const newMessage = action.payload;
+      const isDuplicate = state.messages.some((m) => m._id === newMessage._id);
+
       if (!isDuplicate) {
-        state.messages.push(action.payload);
+        // 1. Aapka purana message push logic
+        if (
+          state.selectedUser?._id === newMessage.senderId ||
+          state.selectedUser?._id === newMessage.recieverId
+        ) {
+          state.messages.push(newMessage);
+        }
+
+        // 2. SORTING LOGIC (Hamesha chalega chahe chat open ho ya nahi)
+        // Partner Id dhundo (Jo message bhej raha hai)
+        const partnerId = newMessage.senderId;
+        const userIndex = state.users.findIndex((u) => u._id === partnerId);
+
+        if (userIndex !== -1) {
+          const userObj = state.users.splice(userIndex, 1)[0];
+          state.users.unshift(userObj); // User ko top par le aaye
+        }
       }
     },
 
@@ -105,6 +136,11 @@ const chatAppSlice = createSlice({
       const userId = action.payload;
       if (!state.unreadCounts) state.unreadCounts = {};
       state.unreadCounts[userId] = 0;
+    },
+
+    removeMessageLocal: (state, action) => {
+     const messageId = action.payload;
+     state.messages = state.messages.filter((m) => m._id !== messageId);
     },
   },
 
@@ -136,15 +172,30 @@ const chatAppSlice = createSlice({
         state.isSendindMessages = true;
       })
       .addCase(sendMessage.fulfilled, (state, action) => {
-        state.isSendindMessages = false; 
+        state.isSendindMessages = false;
         if (!Array.isArray(state.messages)) state.messages = [];
+
         const newMessage = action.payload.newMessage;
+
         if (newMessage) {
+          // 1. Duplicate check
           const isDuplicate = state.messages.some(
             (m) => m._id === newMessage._id
           );
+
           if (!isDuplicate) {
             state.messages.push(newMessage);
+          }
+
+          // --- RECENT CHAT SORTING LOGIC FOR SENDER ---
+          // Jab aapne message bheja, toh receiver (jisne message receive kiya)
+          // usko sidebar mein sabse upar laana hai.
+          const receiverId = newMessage.recieverId;
+          const userIndex = state.users.findIndex((u) => u._id === receiverId);
+
+          if (userIndex !== -1) {
+            const userObj = state.users.splice(userIndex, 1)[0];
+            state.users.unshift(userObj);
           }
         }
       })
@@ -158,6 +209,10 @@ const chatAppSlice = createSlice({
             ? { ...msg, seen: true }
             : msg
         );
+      })
+      .addCase(deleteMessageAction.fulfilled, (state, action) => {
+        const deletedMessageId = action.payload;
+        state.messages = state.messages.filter((m) => m._id !== deletedMessageId);
       });
   },
 });
@@ -168,6 +223,7 @@ export const {
   updateMessageStatusLocal,
   incrementUnreadCount,
   resetUnreadCount,
+  removeMessageLocal
 } = chatAppSlice.actions;
 
 export default chatAppSlice.reducer;
