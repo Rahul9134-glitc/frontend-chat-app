@@ -23,7 +23,7 @@ const Navbar = () => {
               <div className='w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center'>
                 <MessageSquare className='w-5 h-5 text-white' />
               </div>
-              <h1 className='text-lg font-bold text-gray-900 tracking-tight'>Talkie</h1>
+              <h1 className='text-lg font-bold text-gray-900 tracking-tight'>GupShup</h1>
             </Link>
           </div>
 

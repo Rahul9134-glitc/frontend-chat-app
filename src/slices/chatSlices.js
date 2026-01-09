@@ -61,6 +61,23 @@ export const sendMessage = createAsyncThunk(
   }
 );
 
+export const addReactionAction = createAsyncThunk(
+  "chat/addReaction",
+  async ({ messageId, emoji }, thunkAPI) => {
+    try {
+      const response = await axiosInstance.post("/message/react", {
+        messageId,
+        emoji,
+      });
+      return { messageId, reactions: response.data.data.reactions };
+    } catch (error) {
+      return thunkAPI.rejectWithValue(
+        error.response?.data?.message || "Reaction failed"
+      );
+    }
+  }
+);
+
 export const deleteMessageAction = createAsyncThunk(
   "chat/deleteMessage",
   async (messageId, thunkAPI) => {
@@ -119,28 +136,44 @@ const chatAppSlice = createSlice({
         }
 
         // --- SIDEBAR LATEST MESSAGE UPDATE LOGIC ---
-        const partnerId =
-          newMessage.senderId === state.selectedUser?._id
-            ? newMessage.senderId
-            : newMessage.senderId !== state.selectedUser?._id
-            ? newMessage.senderId
-            : newMessage.recieverId;
+        newMessage.senderId === state.selectedUser?._id
+          ? newMessage.senderId
+          : newMessage.senderId !== state.selectedUser?._id
+          ? newMessage.senderId
+          : newMessage.recieverId;
 
         const userIndex = state.users.findIndex(
           (u) => u._id === newMessage.senderId
         );
 
         if (userIndex !== -1) {
-          // 1. User object nikaalo
           const userObj = { ...state.users[userIndex] };
 
-          // 2. Uska lastMessage aur Time update karo (YAHI MISSING THA)
           userObj.lastMessage = newMessage;
           userObj.lastMessageTime = newMessage.createdAt;
 
-          // 3. Purana hatao aur naya Top par daalo
           state.users.splice(userIndex, 1);
           state.users.unshift(userObj);
+        }
+      }
+    },
+
+    updateMessageReaction: (state, action) => {
+      const { messageId, emoji, userId, actionType } = action.payload;
+      const message = state.messages.find((m) => m._id === messageId);
+
+      if (message) {
+        if (!message.reactions) message.reactions = [];
+
+        if (actionType === "REMOVED") {
+          message.reactions = message.reactions.filter(
+            (r) => r.userId !== userId
+          );
+        } else if (actionType === "UPDATED") {
+          const reaction = message.reactions.find((r) => r.userId === userId);
+          if (reaction) reaction.emoji = emoji;
+        } else if (actionType === "ADDED") {
+          message.reactions.push({ emoji, userId });
         }
       }
     },
@@ -251,6 +284,13 @@ const chatAppSlice = createSlice({
       .addCase(searchUsersAction.rejected, (state) => {
         state.isSearchLoading = false;
         state.searchResults = [];
+      })
+      .addCase(addReactionAction.fulfilled, (state, action) => {
+        const { messageId, reactions } = action.payload;
+        const message = state.messages.find((m) => m._id === messageId);
+        if (message) {
+          message.reactions = reactions;
+        }
       });
   },
 });
@@ -262,6 +302,7 @@ export const {
   incrementUnreadCount,
   resetUnreadCount,
   removeMessageLocal,
+  updateMessageReaction,
 } = chatAppSlice.actions;
 
 export default chatAppSlice.reducer;
