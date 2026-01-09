@@ -42,8 +42,6 @@ export const markMessagesAsSeen = createAsyncThunk(
   }
 );
 
-
-
 // Send a new message (Handles both Text and Media)
 export const sendMessage = createAsyncThunk(
   "chat/sendMessage",
@@ -63,7 +61,6 @@ export const sendMessage = createAsyncThunk(
   }
 );
 
-
 export const deleteMessageAction = createAsyncThunk(
   "chat/deleteMessage",
   async (messageId, thunkAPI) => {
@@ -76,6 +73,17 @@ export const deleteMessageAction = createAsyncThunk(
   }
 );
 
+export const searchUsersAction = createAsyncThunk(
+  "chat/searchUsers",
+  async (query, { rejectWithValue }) => {
+    try {
+      const { data } = await axiosInstance.get(`/users/search?query=${query}`);
+      return data.users;
+    } catch (error) {
+      return rejectWithValue(error.response.data.message);
+    }
+  }
+);
 
 const chatAppSlice = createSlice({
   name: "chat",
@@ -87,11 +95,14 @@ const chatAppSlice = createSlice({
     isMessagesLoading: false,
     isSendindMessages: false,
     unreadCounts: {},
+    searchResults: [],
+    isSearchLoading: false,
   },
 
   reducers: {
     setSelectedUser: (state, action) => {
       state.selectedUser = action.payload;
+      state.searchResults = [];
     },
 
     addMessage: (state, action) => {
@@ -99,7 +110,7 @@ const chatAppSlice = createSlice({
       const isDuplicate = state.messages.some((m) => m._id === newMessage._id);
 
       if (!isDuplicate) {
-        // 1. Aapka purana message push logic
+        // Chat window update logic
         if (
           state.selectedUser?._id === newMessage.senderId ||
           state.selectedUser?._id === newMessage.recieverId
@@ -107,14 +118,29 @@ const chatAppSlice = createSlice({
           state.messages.push(newMessage);
         }
 
-        // 2. SORTING LOGIC (Hamesha chalega chahe chat open ho ya nahi)
-        // Partner Id dhundo (Jo message bhej raha hai)
-        const partnerId = newMessage.senderId;
-        const userIndex = state.users.findIndex((u) => u._id === partnerId);
+        // --- SIDEBAR LATEST MESSAGE UPDATE LOGIC ---
+        const partnerId =
+          newMessage.senderId === state.selectedUser?._id
+            ? newMessage.senderId
+            : newMessage.senderId !== state.selectedUser?._id
+            ? newMessage.senderId
+            : newMessage.recieverId;
+
+        const userIndex = state.users.findIndex(
+          (u) => u._id === newMessage.senderId
+        );
 
         if (userIndex !== -1) {
-          const userObj = state.users.splice(userIndex, 1)[0];
-          state.users.unshift(userObj); // User ko top par le aaye
+          // 1. User object nikaalo
+          const userObj = { ...state.users[userIndex] };
+
+          // 2. Uska lastMessage aur Time update karo (YAHI MISSING THA)
+          userObj.lastMessage = newMessage;
+          userObj.lastMessageTime = newMessage.createdAt;
+
+          // 3. Purana hatao aur naya Top par daalo
+          state.users.splice(userIndex, 1);
+          state.users.unshift(userObj);
         }
       }
     },
@@ -139,8 +165,8 @@ const chatAppSlice = createSlice({
     },
 
     removeMessageLocal: (state, action) => {
-     const messageId = action.payload;
-     state.messages = state.messages.filter((m) => m._id !== messageId);
+      const messageId = action.payload;
+      state.messages = state.messages.filter((m) => m._id !== messageId);
     },
   },
 
@@ -173,28 +199,27 @@ const chatAppSlice = createSlice({
       })
       .addCase(sendMessage.fulfilled, (state, action) => {
         state.isSendindMessages = false;
-        if (!Array.isArray(state.messages)) state.messages = [];
-
         const newMessage = action.payload.newMessage;
 
         if (newMessage) {
-          // 1. Duplicate check
+          // Messages list update
           const isDuplicate = state.messages.some(
             (m) => m._id === newMessage._id
           );
+          if (!isDuplicate) state.messages.push(newMessage);
 
-          if (!isDuplicate) {
-            state.messages.push(newMessage);
-          }
-
-          // --- RECENT CHAT SORTING LOGIC FOR SENDER ---
-          // Jab aapne message bheja, toh receiver (jisne message receive kiya)
-          // usko sidebar mein sabse upar laana hai.
+          // --- SIDEBAR UPDATE FOR SENDER ---
           const receiverId = newMessage.recieverId;
           const userIndex = state.users.findIndex((u) => u._id === receiverId);
 
           if (userIndex !== -1) {
-            const userObj = state.users.splice(userIndex, 1)[0];
+            const userObj = { ...state.users[userIndex] };
+
+            // Latest data update
+            userObj.lastMessage = newMessage;
+            userObj.lastMessageTime = newMessage.createdAt;
+
+            state.users.splice(userIndex, 1);
             state.users.unshift(userObj);
           }
         }
@@ -212,7 +237,20 @@ const chatAppSlice = createSlice({
       })
       .addCase(deleteMessageAction.fulfilled, (state, action) => {
         const deletedMessageId = action.payload;
-        state.messages = state.messages.filter((m) => m._id !== deletedMessageId);
+        state.messages = state.messages.filter(
+          (m) => m._id !== deletedMessageId
+        );
+      })
+      .addCase(searchUsersAction.pending, (state) => {
+        state.isSearchLoading = true;
+      })
+      .addCase(searchUsersAction.fulfilled, (state, action) => {
+        state.isSearchLoading = false;
+        state.searchResults = action.payload;
+      })
+      .addCase(searchUsersAction.rejected, (state) => {
+        state.isSearchLoading = false;
+        state.searchResults = [];
       });
   },
 });
@@ -223,7 +261,7 @@ export const {
   updateMessageStatusLocal,
   incrementUnreadCount,
   resetUnreadCount,
-  removeMessageLocal
+  removeMessageLocal,
 } = chatAppSlice.actions;
 
 export default chatAppSlice.reducer;
